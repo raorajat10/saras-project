@@ -1,0 +1,5 @@
+*.pid
+*.tmp
+__pycache__/
+logs/
+scored_customers.csv

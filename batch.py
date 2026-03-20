@@ -24,12 +24,14 @@ def post_json(url: str, payload: dict) -> dict:
 
 def configure_logging() -> None:
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        filename=LOGS_DIR / "batch_log.txt",
-        filemode="a",
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    logger = logging.getLogger()
+    logger.handlers.clear()
+    logger.setLevel(logging.INFO)
+
+    file_handler = logging.FileHandler(LOGS_DIR / "batch_log.txt", mode="a", encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(file_handler)
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,6 +43,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     configure_logging()
+    logging.info("Batch scoring started for input: %s", args.input)
 
     frame = pd.read_csv(args.input)
     if "Unnamed: 0" in frame.columns:
@@ -51,7 +54,9 @@ def main() -> None:
     probabilities = []
     failures = 0
 
-    for _, row in frame.iterrows():
+    total_rows = len(frame)
+
+    for index, (_, row) in enumerate(frame.iterrows(), start=1):
         customer = {column: row[column] for column in feature_columns}
         payload = {"customer": customer}
         try:
@@ -65,6 +70,9 @@ def main() -> None:
             failures += 1
             logging.exception("Failed prediction for customerID=%s: %s", row.get("customerID"), exc)
 
+        if index == 1 or index % 10 == 0 or index == total_rows:
+            logging.info("Processed %s/%s customers", index, total_rows)
+
     pd.DataFrame(results).to_csv(OUTPUT_PATH, index=False)
 
     average_probability = round(sum(probabilities) / len(probabilities), 4) if probabilities else 0.0
@@ -74,4 +82,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        logging.shutdown()

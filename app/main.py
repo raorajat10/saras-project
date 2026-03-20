@@ -44,5 +44,15 @@ def predict():
     )
 
 
+
+@app.get("/predict")
+def predict_help():
+    return jsonify(
+        {
+            "message": "Use POST /predict with JSON customer data.",
+            "example_file": "test_data/sample_input.json",
+        }
+    )
 if __name__ == "__main__":
     app.run(host="localhost", port=8000)
+
